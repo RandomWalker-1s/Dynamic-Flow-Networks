@@ -143,11 +143,11 @@ class Link(Cell):
 
     def update_receiving(self):
         self.flow_dict['receiving'].update_state()
-        self.co_state['receiving'] = self.flow_dict['receiving'].get_flow_value()
+        self.co_state['receiving'] = self.flow_dict['receiving'].get_flow()
 
     def update_sending(self):
         self.flow_dict['sending'].update_state()
-        self.co_state['sending'] = self.flow_dict['sending'].get_flow_value()
+        self.co_state['sending'] = self.flow_dict['sending'].get_flow()
 
 
 class Source(Cell):
@@ -176,11 +176,11 @@ class Source(Cell):
 
     def update_sending(self):
         self.flow_dict['sending'].update_state()
-        self.co_state['sending'] = self.flow_dict['sending'].get_flow_value()
+        self.co_state['sending'] = self.flow_dict['sending'].get_flow()
 
     def update_boundary_inflow(self):
         self.flow_dict['boundary_inflow'].update_state()
-        self.co_state['inflow'] = self.flow_dict['boundary_inflow'].get_flow_value()
+        self.co_state['inflow'] = self.flow_dict['boundary_inflow'].get_flow()
 
 
 
@@ -210,11 +210,11 @@ class Sink(Cell):
 
     def update_receiving(self):
         self.flow_dict['receiving'].update_state()
-        self.co_state['receiving'] = self.flow_dict['receiving'].get_flow_value()
+        self.co_state['receiving'] = self.flow_dict['receiving'].get_flow()
 
     def update_boundary_outflow(self):
         self.flow_dict['boundary_outflow'].update_state()
-        self.co_state['outflow'] = self.flow_dict['boundary_outflow'].get_flow_value()
+        self.co_state['outflow'] = self.flow_dict['boundary_outflow'].get_flow()
 
 
 

@@ -20,13 +20,15 @@ class Flow:
             self.cell = None
             self.param['state_len'] = np.nan
 
-
     def initialize(self):
-        # flow_value: (state_len, ).
-        self.state['flow_value'] = np.full(self.param['state_len'], np.nan) 
+        # flow: (state_len, ).
+        self.state['flow'] = np.full(self.param['state_len'], np.nan) 
 
-    def get_flow_value(self):
-        return self.state['flow_value']
+    def get_flow(self):
+        return self.state['flow']
+
+    def calculate_flow(self):
+        pass
 
     def update_state(self):
         pass
@@ -45,16 +47,18 @@ class BoundaryInflow(Flow):
         # is_constant: bool.
         self.param['is_bc_constant'] = is_bc_constant
 
-
-    def update_state(self):
+    def calculate_flow(self, step=None):
         # _boundary_inflow: : (1, ) or (state_len, ).
         if self.param['is_bc_constant']:
             _boundary_inflow = self.param['boundary_inflow']
         else:
-            _boundary_inflow = self.param['boundary_inflow'][:, self.cell.net.step]
+            _boundary_inflow = self.param['boundary_inflow'][:, step]
 
-        # flow_value: (state_len, ).
-        self.state['flow_value'] = _boundary_inflow * np.ones(self.param['state_len'])
+        return _boundary_inflow
+
+    def update_state(self):
+        # flow: (state_len, ).
+        self.state['flow'] = self.calculate_flow(self.cell.net.step) * np.ones(self.param['state_len'])
 
 
 class BoundaryOutflow(Flow):
@@ -75,17 +79,18 @@ class BoundaryOutflow(Flow):
         # is_constant: bool.
         self.param['is_bc_constant'] = is_bc_constant
 
-
-    def update_state(self):
+    def calculate_flow(self, density, step=None):
         # _boundary_speed, _boundary_capacity: (1, ) or (state_len, ).
         if self.param['is_bc_constant']:
             _boundary_speed, _boundary_capacity = self.param['boundary_speed'], self.param['boundary_capacity']
         else:
-            _boundary_speed, _boundary_capacity = self.param['boundary_speed'][:, self.cell.net.step], self.param['boundary_capacity'][:, self.cell.net.step]
+            _boundary_speed, _boundary_capacity = self.param['boundary_speed'][:, step], self.param['boundary_capacity'][:, step]
 
-        # flow_value: (state_len, ).
-        self.state['flow_value'] = np.minimum(self.cell.state['density'] * _boundary_speed, _boundary_capacity)
+        return np.minimum(_boundary_speed * density, _boundary_capacity)
 
+    def update_state(self):
+        # flow: (state_len, ).
+        self.state['flow'] = self.calculate_flow(self.cell.state['density'], self.cell.net.step)
 
 
 #----------------------------Sending flow functions---------------------------------
@@ -107,20 +112,23 @@ class BufferSendingFlow(Flow):
         # ignore_queue: bool. 
         self.param['ignore_queue'] = ignore_queue
 
-
-    def update_state(self):
+    def calculate_flow(self, step=None, queue_len=None):
         # _demand: (1, ) or (state_len, ).
         if self.param['is_demand_constant']:
             _demand = self.param['demand']
         else:
-            _demand = self.param['demand'][:, self.cell.net.step]
-
+            _demand = self.param['demand'][:, step]
+        
         if self.param['ignore_queue']:
-            # flow_value: (state_len, ).
-            self.state['flow_value'] = _demand * np.ones(self.param['state_len'])
+            return _demand
         else:
-            # flow_value: (state_len, ).
-            self.state['flow_value'] = np.minimum(_demand+self.cell.state['density']*self.cell.param['cell_len']/self.cell.net.time_step_size, self.param['capacity'])
+            # queue_len: (state_len, ).
+            return np.minimum(_demand + queue_len / self.cell.net.time_step_size, self.param['capacity'])
+
+    def update_state(self):
+        # flow: (state_len, ).
+        queue_len = self.cell.state['density'] * self.cell.param['cell_len']
+        self.state['flow'] = self.calculate_flow(self.cell.net.step, queue_len) * np.ones(self.param['state_len'])
 
 
 
@@ -135,11 +143,13 @@ class PiecewiseLinearSendingFlow(Flow):
         # capacity: (1, ) or (state_len, ).
         self.param['capacity'] = np.atleast_1d(capacity)
 
+    def calculate_flow(self, density):
+        return np.minimum(self.param['free_flow_speed'] * density, self.param['capacity'])
 
     def update_state(self):
-        # flow_value: (state_len, ).
-        self.state['flow_value'] = np.minimum(self.param['free_flow_speed'] * self.cell.state['density'], self.param['capacity'])
-
+        # flow: (state_len, ).
+        self.state['flow'] = self.calculate_flow(self.cell.state['density'])
+        
 
 
 class CapacityDropPiecewiseLinearSendingFlow(Flow):
@@ -159,16 +169,16 @@ class CapacityDropPiecewiseLinearSendingFlow(Flow):
         # capacity_drop_rate: (1, ) or (state_len, ).
         self.param['capacity_dropped'] = np.atleast_1d(capacity_dropped)
 
-    def update_state(self):
-        # _is_capacity_drop_triggered: (state_len, ).
-        _is_capacity_drop_triggered = self.cell.state['density'] > self.param['capacity_drop_density_threshold']
 
-        # _capacity: (state_len, ).
-        _capacity = np.where(_is_capacity_drop_triggered, self.param['capacity_dropped'], self.param['capacity'])
+    def calculate_flow(self, density):
+        real_capacity = np.where(density >  self.param['capacity_drop_density_threshold'], self.param['capacity_dropped'], self.param['capacity'])
+        return np.minimum(self.param['free_flow_speed'] * density, real_capacity)
+
+
+    def update_state(self):        
+        # flow: (state_len, ).
+        self.state['flow'] = self.calculate_flow(self.cell.state['density']) 
         
-        # flow_value: (state_len, ).
-        self.state['flow_value'] = np.minimum(self.param['free_flow_speed'] * self.cell.state['density'], _capacity)
-
 
 
 class MarkovianPiecewiseLinearSendingFlow(Flow):
@@ -199,23 +209,21 @@ class MarkovianPiecewiseLinearSendingFlow(Flow):
 
 
     def initialize(self):
-        # flow_value: (state_len, ).
-        self.state['flow_value'] = np.full(self.param['state_len'], np.nan)
+        # flow: (state_len, ).
+        self.state['flow'] = np.full(self.param['state_len'], np.nan)
         
         # real_time_mode: (state_len, ).
         self.state['real_time_mode'] = self.param['initial_mode']
 
 
+    def calculate_flow(self, density, mode):
+        return np.minimum(self.param['free_flow_speed'][mode] * density, self.param['capacity'][mode])
+
+
     def update_state(self):
-        # _free_flow_speed: (state_len, ).
-        _free_flow_speed = self.param['free_flow_speed'][self.state['real_time_mode']]
-
-        # _capacity: (state_len, ).
-        _capacity = self.param['capacity'][self.state['real_time_mode']]
-
-        # flow_value: (state_len, ).
-        self.state['flow_value'] = np.minimum(self.cell.state['density'] * _free_flow_speed, _capacity)
-
+        # flow: (state_len, ).
+        self.state['flow'] = self.calculate_flow(self.cell.state['density'], self.state['real_time_mode']) 
+        
         # real_time_mode: (state_len, ).
         self.state['real_time_mode'] = self.sample_next_mode()
     
@@ -244,9 +252,12 @@ class UnboundedReceivingFlow(Flow):
     def __init__(self, cell=None):
         super().__init__(cell=cell)
 
+    def calculate_flow(self):
+        return np.inf
+
     def update_state(self):
-        # flow_value: (state_len, ).
-        self.state['flow_value'] = np.inf * np.ones(self.param['state_len'])
+        # flow: (state_len, ).
+        self.state['flow'] = self.calculate_flow() * np.ones(self.param['state_len'])
 
 
 class PiecewiseLinearReceivingFlow(Flow):
@@ -263,11 +274,14 @@ class PiecewiseLinearReceivingFlow(Flow):
         # capacity: (1, ) or (state_len, ).
         self.param['capacity'] = np.atleast_1d(capacity)
 
-    def update_state(self):
-        # flow_value: (state_len, ).
-        self.state['flow_value'] = np.minimum(self.param['congestion_wave_speed'] * (self.param['max_density'] - self.cell.state['density']), self.param['capacity'])
-    
+    def calculate_flow(self, density):
+        return np.minimum(self.param['congestion_wave_speed'] * (self.param['max_density'] - density), self.param['capacity'])
 
+    def update_state(self):
+        # flow: (state_len, ).
+        self.state['flow'] = self.calculate_flow(self.cell.state['density'])
+        
+        
 
 class LookAheadPiecewiseLinearReceivingFlow(Flow):
     def __init__(self, congestion_wave_speed, max_density, capacity, 
@@ -300,23 +314,37 @@ class LookAheadPiecewiseLinearReceivingFlow(Flow):
         self.param['look_ahead_capacity'] = look_ahead_capacity
 
 
+    def calculate_flow(self, density, density_upstream):
+
+        is_look_ahead_triggered = density_upstream <= self.param['look_ahead_density_threshold']
+
+        real_congestion_wave_speed = np.where(
+            is_look_ahead_triggered, 
+            self.param['look_ahead_congestion_wave_speed'], 
+            self.param['congestion_wave_speed'], 
+        )
+
+        real_max_density = np.where(
+            is_look_ahead_triggered,
+            self.param['look_ahead_max_density'], 
+            self.param['max_density'],    
+        )
+
+        real_capacity = np.where(
+            is_look_ahead_triggered, 
+            self.param['look_ahead_capacity'], 
+            self.param['capacity']
+        )
+
+        return np.minimum(real_congestion_wave_speed * (real_max_density - density), real_capacity)
+
+
     def update_state(self):
-        # _is_look_ahead_triggered: (state_len, ).
-        _is_look_ahead_triggered = self.cell_upstream.state['density']<=self.param['look_ahead_density_threshold']
-
-        # _congestion_wave_speed: (state_len, ).
-        _congestion_wave_speed = np.where(_is_look_ahead_triggered, self.param['look_ahead_congestion_wave_speed'], self.param['congestion_wave_speed'])
+        # flow: (state_len, ).
+        self.state['flow'] = self.calculate_flow(self.cell.state['density'], self.cell_upstream.state['density'])
         
-        # _density_max: (1, ) or (state_len, ).
-        _density_max = np.where(_is_look_ahead_triggered, self.param['look_ahead_max_density'], self.param['max_density'])
         
-        # _capacity: (1, ) or (state_len, ).
-        _capacity = np.where(_is_look_ahead_triggered, self.param['look_ahead_capacity'], self.param['capacity'])
-
-        # flow_value: (state_len, ).
-        self.state['flow_value'] = np.minimum(_congestion_wave_speed * (_density_max - self.cell.state['density']), _capacity)
-
-
+        
 
 if __name__ == '__main__':
     pass

@@ -7,6 +7,7 @@ def merge_two_flows_with_priority(s_0, s_1, r, p_0, p_1):
     is_space_enough = (s_0 + s_1) <= r
     flow_0 = np.where(is_space_enough, s_0, np.median([s_0, r - s_1, p_0 * r], axis=0))
     flow_1 = np.where(is_space_enough, s_1, np.median([s_1, r - s_0, p_1 * r], axis=0))
+
     return flow_0, flow_1
 
 # ============================== Node =====================================
@@ -26,28 +27,49 @@ class Node:
         for c in self.outgoing_cell_list:
             c.node['head'] = self
 
+        self.incoming_cell_outflow_list = [None for _ in self.incoming_cell_list]
+        self.outgoing_cell_inflow_list = [None for _ in self.outgoing_cell_list]
+
+
     def initialize(self):
         pass
+
 
     def _sending_list(self):
         return [cell.co_state['sending'] for cell in self.incoming_cell_list]
 
+
     def _receiving_list(self):
         return [cell.co_state['receiving'] for cell in self.outgoing_cell_list]
     
-    def update_inter_cell_flow(self) -> None:
-        outflow_list, inflow_list = self.assign_inter_cell_flow()
 
-        for cell, outflow in zip(self.incoming_cell_list, outflow_list):
-            cell.co_state['outflow'] = outflow
+    def assign_inter_cell_flow(self, sending_list, receiving_list):
+        incoming_cell_outflow_list = [None for _ in sending_list]
+        outgoing_cell_inflow_list = [None for _ in receiving_list]
+        return incoming_cell_outflow_list, outgoing_cell_inflow_list
+
+
+    def update_flow_at_node(self):
+        self.incoming_cell_outflow_list, self.outgoing_cell_inflow_list = self.assign_inter_cell_flow(
+            self._sending_list(), 
+            self._receiving_list(),
+        )
+
+
+    def broadcast_flow_to_cell(self):
+        for cell, flow in zip(self.incoming_cell_list, self.incoming_cell_outflow_list):
+            cell.co_state['outflow'] = flow
             
-        for cell, inflow in zip(self.outgoing_cell_list, inflow_list):
-            cell.co_state['inflow'] = inflow
+        for cell, flow in zip(self.outgoing_cell_list, self.outgoing_cell_inflow_list):
+            cell.co_state['inflow'] = flow
+
+
+    def update_inter_cell_flow(self):
+        # First update incoming and outgoing flows at node. 
+        self.update_flow_at_node()
+        # Then update associated flows for cells. 
+        self.broadcast_flow_to_cell()
         
-    def assign_inter_cell_flow(self):
-        outflow_list = [None for _ in self.incoming_cell_list]
-        inflow_list = [None for _ in self.outgoing_cell_list]
-        return outflow_list, inflow_list
 
 
 # ============================== 1 -> 1 =====================================
@@ -56,8 +78,8 @@ class BasicJunction(Node):
     def __init__(self, ID, incoming_cell_list, outgoing_cell_list):
         super().__init__(ID, incoming_cell_list, outgoing_cell_list)
 
-    def assign_inter_cell_flow(self):
-        flow = np.minimum(self._sending_list()[0],  self._receiving_list()[0])
+    def assign_inter_cell_flow(self, sending_list, receiving_list):
+        flow = np.minimum(sending_list[0], receiving_list[0])
         return [flow], [flow]
 
 
@@ -73,17 +95,18 @@ class TwoToOneMergeJunction(Node):
     def _merging_priority(self):
         return self.param['merging_priority'][:, 0], self.param['merging_priority'][:, 1] 
 
-    def assign_inter_cell_flow(self):
-        sending_i_0, sending_i_1 = self._sending_list()
-        receiving_j_0 = self._receiving_list()[0]
+    def assign_inter_cell_flow(self, sending_list, receiving_list):
+        sending_i_0, sending_i_1 = sending_list
+        receiving_j_0 = receiving_list[0]
+
         p_i_0, p_i_1 = self._merging_priority() 
 
         flow_i_0_j_0, flow_i_1_j_0 = merge_two_flows_with_priority(sending_i_0, sending_i_1, receiving_j_0, p_i_0, p_i_1)
 
-        outflow_list = [flow_i_0_j_0, flow_i_1_j_0]
-        inflow_list = [flow_i_0_j_0 + flow_i_1_j_0]
+        incoming_cell_outflow_list = [flow_i_0_j_0, flow_i_1_j_0]
+        outgoing_cell_inflow_list = [flow_i_0_j_0 + flow_i_1_j_0]
 
-        return outflow_list, inflow_list
+        return incoming_cell_outflow_list, outgoing_cell_inflow_list
 
 
 # ============================== 1 -> 2 (diverging) =====================================
@@ -99,17 +122,20 @@ class OneToTwoDivergeJunction(Node):
         self.param['is_split_ratio_constant'] = is_split_ratio_constant
         self.param['is_FIFO'] = is_FIFO
 
-    def _split_ratio(self):
+
+    def _split_ratio(self, step=None):
         if self.param['is_split_ratio_constant']:
             split_j_0, split_j_1 = self.param['split_ratio'][:, 0], self.param['split_ratio'][:, 1]
         else:
-            split_j_0, split_j_1 = self.param['split_ratio'][:, 0, self.net.step], self.param['split_ratio'][:, 1, self.net.step]
+            split_j_0, split_j_1 = self.param['split_ratio'][:, 0, step], self.param['split_ratio'][:, 1, step]
         return split_j_0, split_j_1
 
-    def assign_inter_cell_flow(self):
-        sending_i_0  = self._sending_list()[0]
-        receiving_j_0, receiving_j_1 = self._receiving_list()
-        split_j_0, split_j_1 = self._split_ratio()
+
+    def assign_inter_cell_flow(self, sending_list, receiving_list, step=None):
+        sending_i_0  = sending_list[0]
+        receiving_j_0, receiving_j_1 = receiving_list
+
+        split_j_0, split_j_1 = self._split_ratio(step)
 
         if not self.param['is_FIFO']:
             flow_i_0_j_0 = np.minimum(split_j_0 * sending_i_0, receiving_j_0)
@@ -119,10 +145,18 @@ class OneToTwoDivergeJunction(Node):
             flow_i_0_j_0 = split_j_0 * total_flow
             flow_i_0_j_1 = split_j_1 * total_flow
 
-        outflow_list = [flow_i_0_j_0 + flow_i_0_j_1]
-        inflow_list = [flow_i_0_j_0, flow_i_0_j_1]
+        incoming_cell_outflow_list = [flow_i_0_j_0 + flow_i_0_j_1]
+        outgoing_cell_inflow_list = [flow_i_0_j_0, flow_i_0_j_1]
 
-        return outflow_list, inflow_list
+        return incoming_cell_outflow_list, outgoing_cell_inflow_list
+
+
+    def update_flow_at_node(self):
+        self.incoming_cell_outflow_list, self.outgoing_cell_inflow_list = self.assign_inter_cell_flow(
+            self._sending_list(), 
+            self._receiving_list(),
+            self.net.step, 
+        )
 
 
 # ============================== 2 -> 2 (first diverging then merging) =====================================
@@ -146,18 +180,20 @@ class FreewayRampJunction(Node):
     def _merging_priority(self):
         return self.param['merging_priority'][:, 0], self.param['merging_priority'][:, 1] 
 
-    def _split_ratio(self):
+    def _split_ratio(self, step=None):
         if self.param['is_split_ratio_constant']:
             split_to_mainline, split_to_offramp = self.param['split_ratio'][:, 0], self.param['split_ratio'][:, 1]
         else:
-            split_to_mainline, split_to_offramp = self.param['split_ratio'][:, 0, self.net.step], self.param['split_ratio'][:, 1, self.net.step]
+            split_to_mainline, split_to_offramp = self.param['split_ratio'][:, 0, step], self.param['split_ratio'][:, 1, step]
         return split_to_mainline, split_to_offramp
 
-    def assign_inter_cell_flow(self):
-        sending_mainline, sending_onramp = self._sending_list()
-        receiving_mainline, receiving_offramp = self._receiving_list()
+
+    def assign_inter_cell_flow(self, sending_list, receiving_list, step=None):
+        sending_mainline, sending_onramp = sending_list
+        receiving_mainline, receiving_offramp = receiving_list
+
         p_mainline, p_onramp = self._merging_priority()
-        split_to_mainline, split_to_offramp = self._split_ratio()
+        split_to_mainline, split_to_offramp = self._split_ratio(step)
 
         # Compute flows i) from mainline to mainline and ii) from mainline to on-ramp. 
         flow_mainline_to_mainline, flow_onramp_to_mainline = merge_two_flows_with_priority(
@@ -175,11 +211,19 @@ class FreewayRampJunction(Node):
             np.minimum(sending_mainline, receiving_offramp), 
         )
 
-        outflow_list = [flow_mainline_to_mainline + flow_mainline_to_offramp, flow_onramp_to_mainline]
-        inflow_list = [flow_mainline_to_mainline + flow_onramp_to_mainline, flow_mainline_to_offramp]
+        incoming_cell_outflow_list = [flow_mainline_to_mainline + flow_mainline_to_offramp, flow_onramp_to_mainline]
+        outgoing_cell_inflow_list = [flow_mainline_to_mainline + flow_onramp_to_mainline, flow_mainline_to_offramp]
 
-        return outflow_list, inflow_list
-    
+        return incoming_cell_outflow_list, outgoing_cell_inflow_list
+
+
+    def update_flow_at_node(self):
+        self.incoming_cell_outflow_list, self.outgoing_cell_inflow_list = self.assign_inter_cell_flow(
+            self._sending_list(), 
+            self._receiving_list(),
+            self.net.step, 
+        )
+
 
 if __name__ == '__main__':
     pass
