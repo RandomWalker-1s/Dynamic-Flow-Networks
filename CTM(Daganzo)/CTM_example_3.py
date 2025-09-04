@@ -13,6 +13,9 @@ max_density, max_speed = 150, 1
 num_link = 100
 
 def build_corridor():
+    # Create corridor. 
+    corridor = dfn.net.Network(ID='corridor', state_len=1, num_step=40, time_step_size=1)
+
     # Create source.  
     source_0 = dfn.cell.Source(
         ID='source_0', 
@@ -69,18 +72,15 @@ def build_corridor():
     )
     node_list.append(node)
 
-    # Create corridor. 
-    corridor = dfn.net.Network(ID='corridor', num_step=40, time_step_size=1)
-
     # Add cells to corridor. 
-    corridor.add_component('source', source_0)
+    corridor.add_cell('source', source_0)
     for link in link_list:
-        corridor.add_component('link', link)
-    corridor.add_component('sink', sink_0)
+        corridor.add_cell('link', link)
+    corridor.add_cell('sink', sink_0)
 
     # Add nodes to corridor. 
     for node in node_list:
-        corridor.add_component('node', node)
+        corridor.add_node(node)
 
     return corridor
 
