@@ -2,7 +2,6 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 import sys
-import itertools
 
 sys.path.append('../')
 import dyflownet as dfn 
@@ -11,24 +10,20 @@ import dyflownet as dfn
 v, F, w = 60, 6000, 20
 max_density, max_speed = 400, 60
 
-initial_density = list(itertools.product([0, 400], [0, 400]))
-for i in [0, 400]:
-     for j in np.linspace(10, 390, 39):
-        initial_density.append([i, j])
-        initial_density.append([j, i])
+initial_density = dfn.utils.generate_boundary_combos(np.linspace(0, 400, 41), np.linspace(0, 400, 41))
 
-initial_density_link_0, initial_density_link_1 = list(zip(*initial_density))
-
-initial_density_link_0 = np.atleast_1d(initial_density_link_0)
-initial_density_link_1 = np.atleast_1d(initial_density_link_1)
+initial_density_link_0 = initial_density[0, :]
+initial_density_link_1 = initial_density[1, :]
 
 state_len = len(initial_density_link_1)
 
 
 def build_corridor():
+    # Create corridor. 
+    corridor = dfn.net.Network(ID='corridor', state_len=state_len, num_step=3600, time_step_size=6/3600)
+
     source_0 = dfn.cell.Source(
         ID = 'source_0',
-        state_len = state_len,
         initial_condition={'density': [0]*state_len},
         boundary_inflow = dfn.flow.BoundaryInflow([4800]*state_len),
         sending = dfn.flow.BufferSendingFlow([4800]*state_len, ignore_queue=True),
@@ -36,7 +31,6 @@ def build_corridor():
 
     source_1 = dfn.cell.Source(
         ID = 'source_1',
-        state_len = state_len,
         initial_condition={'density': [0]*state_len},
         boundary_inflow = dfn.flow.BoundaryInflow([1200]*state_len),
         sending = dfn.flow.BufferSendingFlow([1200]*state_len, ignore_queue=True),
@@ -46,7 +40,6 @@ def build_corridor():
         ID = 'link_0',
         max_density = max_density,
         max_speed = max_speed,
-        state_len = state_len,
         initial_condition={'density': initial_density_link_0},
         receiving = dfn.flow.PiecewiseLinearReceivingFlow(w, max_density, F), 
         sending = dfn.flow.PiecewiseLinearSendingFlow(v, F),
@@ -56,7 +49,6 @@ def build_corridor():
         ID = 'link_1',
         max_density = max_density,
         max_speed = max_speed,
-        state_len = state_len,
         initial_condition={'density': initial_density_link_1},
         receiving = dfn.flow.PiecewiseLinearReceivingFlow(w, max_density, F), 
         sending = dfn.flow.PiecewiseLinearSendingFlow(v, F),
@@ -66,7 +58,6 @@ def build_corridor():
         ID = 'sink_0',
         max_density = max_density,
         max_speed = max_speed,
-        state_len = state_len,
         initial_condition={'density': [0]*state_len},
         receiving = dfn.flow.PiecewiseLinearReceivingFlow(w, max_density, F),
         boundary_outflow = dfn.flow.BoundaryOutflow(v, F),
@@ -77,20 +68,18 @@ def build_corridor():
     node_1 = dfn.node.TwoToOneMergeJunction(ID = 'node_1', incoming_cell_list=[link_0, source_1], outgoing_cell_list=[link_1], merging_priority=[1, 1])
     node_2 = dfn.node.BasicJunction(ID = 'node_2', incoming_cell_list=[link_1], outgoing_cell_list=[sink_0])
 
-    # Create corridor. 
-    corridor = dfn.net.Network(ID='corridor', num_step=3600, time_step_size=6/3600)
 
     # Add cells to corridor. 
-    corridor.add_component('source', source_0)
-    corridor.add_component('source', source_1)
-    corridor.add_component('link', link_0)
-    corridor.add_component('link', link_1)
-    corridor.add_component('sink', sink_0)
+    corridor.add_cell('source', source_0)
+    corridor.add_cell('source', source_1)
+    corridor.add_cell('link', link_0)
+    corridor.add_cell('link', link_1)
+    corridor.add_cell('sink', sink_0)
 
     # Add nodes to corridor. 
-    corridor.add_component('node', node_0)
-    corridor.add_component('node', node_1)
-    corridor.add_component('node', node_2)
+    corridor.add_node(node_0)
+    corridor.add_node(node_1)
+    corridor.add_node(node_2)
 
     return corridor
 
