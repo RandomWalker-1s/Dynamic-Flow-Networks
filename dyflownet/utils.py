@@ -67,17 +67,17 @@ class NetUnit:
     def initialize_output(self):
         if self.param['is_saved']:
             for k, v in self.state.items():
-                self.state_output[k] = np.full([self.net.param['num_step']+1, self.net.param['state_len']], np.nan)
-                self.state_output[k][0, :] = v
+                self.state_output[k] = np.full(v.shape + (self.net.param['num_step']+1,), np.nan)
+                self.state_output[k][:, 0] = v
             
-            for k in self.co_state:
-                self.co_state_output[k] = np.full([self.net.param['num_step'], self.net.param['state_len']], np.nan)
+            for k, v in self.co_state.items():
+                self.co_state_output[k] = np.full(v.shape + (self.net.param['num_step'],), np.nan)
             
     
     def save_output(self):
         if self.param['is_saved']:
             for k, v in self.state_output.items():
-                v[self.net.step+1, :] = self.state[k]
+                v[..., self.net.step+1] = self.state[k]
 
             for k, v in self.co_state_output.items():
-                v[self.net.step, :] = self.co_state[k]
+                v[..., self.net.step] = self.co_state[k]

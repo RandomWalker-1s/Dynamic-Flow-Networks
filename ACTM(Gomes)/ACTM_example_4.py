@@ -109,14 +109,14 @@ ax = fig.add_subplot(projection='3d')
 
 plt.rcParams.update({'font.size': 8})
 
-ax.scatter(corridor.link_list[2].state_output['density'][3600, :], 
-           corridor.link_list[1].state_output['density'][3600, :],
-           corridor.link_list[0].state_output['density'][3600, :], color="red")
+ax.scatter(corridor.link_list[2].state_output['density'][:, 3600], 
+           corridor.link_list[1].state_output['density'][:, 3600],
+           corridor.link_list[0].state_output['density'][:, 3600], color="red")
 
 for i in range(state_len):
-    ax.plot(corridor.link_list[2].state_output['density'][:, i],
-            corridor.link_list[1].state_output['density'][:, i],
-            corridor.link_list[0].state_output['density'][:, i], 'b', linewidth="0.5")
+    ax.plot(corridor.link_list[2].state_output['density'][i, :],
+            corridor.link_list[1].state_output['density'][i, :],
+            corridor.link_list[0].state_output['density'][i, :], 'b', linewidth="0.5")
 
 
 ax.set_xlabel('Downstream density')

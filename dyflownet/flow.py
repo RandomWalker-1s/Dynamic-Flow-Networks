@@ -1,8 +1,8 @@
 import numpy as np
 from . import utils
 
-class Flow(utils.NetUnit):
 
+class Flow(utils.NetUnit):
     def __init__(self, cell=None, is_saved=True):
 
         net = None if cell is None else cell.net
@@ -15,9 +15,13 @@ class Flow(utils.NetUnit):
     def hook_up_to_cell(self, cell):
         self.cell = cell
 
+
+    def initialize_co_state(self):
+        # flow: (state_len, ). 
+        self.co_state['flow'] = np.full(self.net.param['state_len'], np.nan)
+
     
     def compute_flow(self):
-        # flow: (state_len, ). 
         return np.full(self.net.param['state_len'], np.nan)
     
 
@@ -26,8 +30,12 @@ class Flow(utils.NetUnit):
 
 
     def iterate(self):
-        flow = self._compute_flow()
-        return flow
+        self.co_state['flow'] = self._compute_flow()
+
+
+    def get_flow(self):
+        return self.co_state['flow']
+
     
 
 #------------------------Boundary inflow & outflow functions.------------------------------
@@ -44,18 +52,18 @@ class BoundaryInflow(Flow):
         self.param['is_bc_constant'] = is_bc_constant
     
 
-    def compute_flow(self, step=None):
+    def compute_flow(self, state_len, step=None):
         # boundary_inflow: : (1, ) or (state_len, ).
         if self.param['is_bc_constant']:
             boundary_inflow = self.param['boundary_inflow']
         else:
             boundary_inflow = self.param['boundary_inflow'][:, step]
 
-        return boundary_inflow
+        return boundary_inflow * np.ones(state_len)
     
 
     def _compute_flow(self):
-        return self.compute_flow(self.net.step) * np.ones(self.net.param['state_len'])
+        return self.compute_flow(self.net.param['state_len'], self.net.step)
 
 
 class BoundaryOutflow(Flow):
@@ -111,7 +119,7 @@ class BufferSendingFlow(Flow):
         self.param['ignore_queue'] = ignore_queue
 
 
-    def compute_flow(self, step=None, queue_len=None):
+    def compute_flow(self, state_len=None, step=None, queue_len=None):
         # _demand: (1, ) or (state_len, ).
         if self.param['is_demand_constant']:
             _demand = self.param['demand']
@@ -119,7 +127,7 @@ class BufferSendingFlow(Flow):
             _demand = self.param['demand'][:, step]
         
         if self.param['ignore_queue']:
-            return _demand
+            return _demand * np.ones(state_len)
         else:
             # queue_len: (state_len, ).
             return np.minimum(_demand + queue_len / self.net.param['time_step_size'], self.param['capacity'])
@@ -128,7 +136,7 @@ class BufferSendingFlow(Flow):
     def _compute_flow(self):
         # flow: (state_len, ).
         queue_len = self.cell.state['density'] * self.cell.param['cell_len']
-        return self.compute_flow(self.cell.net.step, queue_len) * np.ones(self.net.param['state_len'])
+        return self.compute_flow(self.net.param['state_len'], self.cell.net.step, queue_len)
 
 
 
@@ -172,15 +180,26 @@ class CapacityDropPiecewiseLinearSendingFlow(Flow):
         self.param['capacity_dropped'] = np.atleast_1d(capacity_dropped)
 
 
+    def initialize_co_state(self):
+        self.co_state['flow'] = np.full(self.net.param['state_len'], np.nan)
+        self.co_state['real_capacity'] = np.full(self.net.param['state_len'], np.nan)
+
+
     def compute_flow(self, density):
         real_capacity = np.where(density >  self.param['capacity_drop_density_threshold'], self.param['capacity_dropped'], self.param['capacity'])
-        return np.minimum(self.param['free_flow_speed'] * density, real_capacity)
+        return np.minimum(self.param['free_flow_speed'] * density, real_capacity), real_capacity
 
 
     def _compute_flow(self):        
         # flow: (state_len, ).
         return self.compute_flow(self.cell.state['density']) 
         
+
+    def iterate(self):
+        flow, real_capacity = self._compute_flow()
+        self.co_state['flow'] = flow
+        self.co_state['real_capacity'] = real_capacity
+
 
 
 class MarkovianPiecewiseLinearSendingFlow(Flow):
@@ -214,7 +233,9 @@ class MarkovianPiecewiseLinearSendingFlow(Flow):
         self.state['real_time_mode'] = self.initial_condition['mode']
 
 
-    def initialize_co_state(self):        
+    def initialize_co_state(self):
+        self.co_state['flow'] = np.full(self.net.param['state_len'], np.nan)
+
         if self.param['has_multi_regime']:
             self.co_state['real_time_regime'] = np.full(self.net.param['state_len'], np.nan)
 
@@ -226,17 +247,7 @@ class MarkovianPiecewiseLinearSendingFlow(Flow):
     def _compute_flow(self):
         # flow: (state_len, ).
         return self.compute_flow(self.cell.state['density'], self.state['real_time_mode']) 
-        
-    def iterate(self):
-        flow = self._compute_flow()
 
-        if self.param['has_multi_regime']:
-            self.co_state['real_time_regime'] = self.find_regime(self.cell.state['density'])
-        
-        self.state['real_time_mode'] = self.sample_next_mode()
-
-        return flow
-    
 
     def sample_next_mode(self):
         if not self.param['has_multi_regime']:
@@ -255,18 +266,27 @@ class MarkovianPiecewiseLinearSendingFlow(Flow):
         return regime_idx 
 
 
+    def iterate(self):
+        self.co_state['flow'] = self._compute_flow()
+
+        if self.param['has_multi_regime']:
+            self.co_state['real_time_regime'] = self.find_regime(self.cell.state['density'])
+        
+        self.state['real_time_mode'] = self.sample_next_mode()
+
+
 #----------------------------Receiving flow functions---------------------------------
  
 class UnboundedReceivingFlow(Flow):
     def __init__(self, cell=None, is_saved=True):
         super().__init__(cell, is_saved)
 
-    def compute_flow(self):
-        return np.inf
+    def compute_flow(self, state_len):
+        return np.inf * np.ones(state_len)
 
     def _compute_flow(self):
         # flow: (state_len, ).
-        return self.compute_flow() * np.ones(self.net.param['state_len'])
+        return self.compute_flow(self.net.param['state_len'])
 
 
 class PiecewiseLinearReceivingFlow(Flow):

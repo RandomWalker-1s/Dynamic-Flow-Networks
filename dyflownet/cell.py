@@ -47,7 +47,7 @@ class Cell(utils.NetUnit):
 
 
     def initialize_co_state(self):
-        for name in ['speed', 'receiving', 'sending', 'inflow', 'outflow']:
+        for name in ['speed', 'inflow', 'outflow']:
             self.co_state[name] = np.full(self.net.param['state_len'], np.nan)
 
 
@@ -97,11 +97,11 @@ class Link(Cell):
 
 
     def update_receiving(self):
-        self.co_state['receiving'] = self.flow_dict['receiving'].iterate()
+        self.flow_dict['receiving'].iterate()
 
 
     def update_sending(self):
-        self.co_state['sending'] = self.flow_dict['sending'].iterate()
+        self.flow_dict['sending'].iterate()
 
 
 
@@ -119,17 +119,12 @@ class Source(Cell):
         self.add_flow('sending', sending)
     
 
-    def initialize_co_state(self):
-        for name in ['speed', 'sending', 'inflow', 'outflow']:
-            self.co_state[name] = np.full(self.net.param['state_len'], np.nan)
-            
-
     def update_boundary_inflow(self):
-        self.co_state['inflow'] = self.flow_dict['boundary_inflow'].iterate()
-
+        self.flow_dict['boundary_inflow'].iterate()
+        self.co_state['inflow'] = self.flow_dict['boundary_inflow'].get_flow()
 
     def update_sending(self):
-        self.co_state['sending'] = self.flow_dict['sending'].iterate()
+        self.flow_dict['sending'].iterate()
 
 
 
@@ -147,18 +142,13 @@ class Sink(Cell):
         self.add_flow('boundary_outflow', boundary_outflow)
 
 
-    def initialize_co_state(self):
-        for name in ['speed', 'receiving', 'inflow', 'outflow']:
-            self.co_state[name] = np.full(self.net.param['state_len'], np.nan)
-
-
     def update_receiving(self):
-        self.co_state['receiving'] = self.flow_dict['receiving'].iterate()
+        self.flow_dict['receiving'].iterate()
 
 
     def update_boundary_outflow(self):
-        self.co_state['outflow'] = self.flow_dict['boundary_outflow'].iterate()
-
+        self.flow_dict['boundary_outflow'].iterate()
+        self.co_state['outflow'] = self.flow_dict['boundary_outflow'].get_flow()
 
 
 if __name__ == '__main__':

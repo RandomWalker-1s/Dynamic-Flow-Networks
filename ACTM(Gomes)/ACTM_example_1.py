@@ -92,16 +92,16 @@ corridor.run()
 plt.figure(figsize=(8, 8))
 plt.rcParams.update({'font.size': 8})
 
-plt.scatter(corridor.link_list[1].state_output['density'][2, :], corridor.link_list[0].state_output['density'][2, :], s=5)
-plt.scatter(corridor.link_list[1].state_output['density'][10, :], corridor.link_list[0].state_output['density'][10, :], s=5)
-plt.scatter(corridor.link_list[1].state_output['density'][50, :], corridor.link_list[0].state_output['density'][50, :], s=5)
-plt.scatter(corridor.link_list[1].state_output['density'][100, :], corridor.link_list[0].state_output['density'][100, :], s=5)
-plt.scatter(corridor.link_list[1].state_output['density'][3600, :], corridor.link_list[0].state_output['density'][3600, :], s=10, color='k')
+plt.scatter(corridor.link_list[1].state_output['density'][:, 2], corridor.link_list[0].state_output['density'][:, 2], s=5)
+plt.scatter(corridor.link_list[1].state_output['density'][:, 10], corridor.link_list[0].state_output['density'][:, 10], s=5)
+plt.scatter(corridor.link_list[1].state_output['density'][:, 50], corridor.link_list[0].state_output['density'][:, 50], s=5)
+plt.scatter(corridor.link_list[1].state_output['density'][:, 100], corridor.link_list[0].state_output['density'][:, 100], s=5)
+plt.scatter(corridor.link_list[1].state_output['density'][:, 3600], corridor.link_list[0].state_output['density'][:, 3600], s=10, color='k')
 
 plt.legend(["12s", "60s", "300s", "600s", "21600s"], loc='upper right')
 
 for i in range(state_len):
-    plt.plot(corridor.link_list[1].state_output['density'][:, i], corridor.link_list[0].state_output['density'][:, i], 'b', linewidth="0.5")
+    plt.plot(corridor.link_list[1].state_output['density'][i, :], corridor.link_list[0].state_output['density'][i, :], 'b', linewidth="0.5")
 
 plt.xlabel('Downstream density')
 plt.ylabel('Upstream density')

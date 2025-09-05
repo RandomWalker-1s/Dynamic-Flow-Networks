@@ -130,4 +130,4 @@ plt.plot([43.5, 43.5, 59.5, 59.5, 43.5], [-0.5, 13.5, 13.5, -0.5, -0.5], 'r-', l
 
 plt.grid(True, which='minor')
 plt.tight_layout()
-plt.savefig('./Corridor_example_2_v2.pdf')
+plt.savefig('./Corridor_example_2.pdf')

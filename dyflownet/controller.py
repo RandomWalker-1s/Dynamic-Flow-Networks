@@ -1,20 +1,21 @@
 import numpy as np
 from . import utils
 
-# ============================== Node =====================================
 
 class LocalController(utils.NetUnit):
-    def __init__(self, min_control_input=0, max_control_input=np.inf, node=None, is_saved=True):
+    def __init__(self, min_control_input=0, max_control_input=np.inf, node=None, cell_list=None, is_saved=True):
 
         net = None if node is None else node.net
 
         super().__init__(net, is_saved)
 
+        self.hook_up_to_node(node)
+
         self.param['min_control_input'] = min_control_input
         self.param['max_control_input'] = max_control_input
 
-        self.hook_up_to_node(node)
-        
+        self.cell_list = [] if cell_list is None else cell_list
+
 
     def hook_up_to_node(self, node):
         self.node = node
@@ -25,11 +26,11 @@ class LocalController(utils.NetUnit):
 
 
     def compute_control_input(self):
-        return
+        return np.full(self.net.param['state_len'], np.nan)
 
 
     def _compute_control_input(self):
-        return
+        return self.compute_control_input()
 
 
     def iterate(self):
@@ -42,24 +43,20 @@ class LocalController(utils.NetUnit):
 
 
 class ALINEA(LocalController):
-    def __init__(self, gain, setpoint, initial_condition, min_control_input=0, max_control_input=np.inf, node=None, cell_list=None, is_saved=True):
+    def __init__(self, gain, setpoint, min_control_input=0, max_control_input=np.inf, node=None, cell_list=None, is_saved=True):
 
-        super().__init__(min_control_input, max_control_input, node, is_saved)
+        super().__init__(min_control_input, max_control_input, node, cell_list, is_saved)
 
         self.param['gain'] = gain
         self.param['setpoint'] = setpoint
 
-        self.cell_list = [] if cell_list is None else cell_list
-
-        self.set_initial_condition(initial_condition)
-
+    
     def initialize_state(self):
-        if len(self.initial_condition['control_input']) == 1:
-            self.state['control_input'] = self.initial_condition['control_input'] * np.ones(self.net.param['state_len'])
-        elif len(self.initial_condition['control_input']) == self.net.param['state_len']:
-            self.state['control_input'] = self.initial_condition['control_input']
-        else:
-            raise ValueError('Wrong length of initial condition.')
+        self.state['control_input'] = self.param['max_control_input'] * np.ones(self.net.param['state_len'])
+
+    
+    def initialize_co_state(self):
+        pass
 
 
     def compute_control_input(self, density, last_step_control_input):
@@ -79,20 +76,15 @@ class ALINEA(LocalController):
         return self.state['control_input']
 
 
+
 class AffineController(LocalController):
     # Control law: H - K*x. 
     def __init__(self, gain, min_control_input=0, max_control_input=np.inf, node=None, cell_list=None, is_saved=True):
 
-        super().__init__(min_control_input, max_control_input, node, is_saved)
+        super().__init__(min_control_input, max_control_input, node, cell_list, is_saved)
 
         self.param['gain'] = gain
 
-        self.cell_list = [] if cell_list is None else cell_list
-
-
-    def initialize_co_state(self):
-        self.co_state['control_input'] = np.full(self.net.param['state_len'], np.nan)
-        
 
     def compute_control_input(self, density):
         control_input = self.param['max_control_input'] - self.param['gain'] * density
