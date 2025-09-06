@@ -203,7 +203,7 @@ class CapacityDropPiecewiseLinearSendingFlow(Flow):
 
 
 class MarkovianPiecewiseLinearSendingFlow(Flow):
-    def __init__(self, mode_list, free_flow_speed, capacity, prob_matrix, initial_mode, has_multi_regime=False, regime_bound_list=None, cell=None, is_saved=True):
+    def __init__(self, mode_list, free_flow_speed, capacity, prob_matrix, initial_condition, has_multi_regime=False, regime_bound_list=None, cell=None, is_saved=True):
 
         super().__init__(cell, is_saved)
 
@@ -226,11 +226,11 @@ class MarkovianPiecewiseLinearSendingFlow(Flow):
         self.param['prob_matrix'] = np.atleast_2d(prob_matrix) if not has_multi_regime else np.atleast_3d(prob_matrix)
 
         # initial_mode: (state_len, ).
-        self.initial_condition['mode'] = np.atleast_1d(initial_mode) * np.ones(self.net.param['state_len'])
-
+        self.set_initial_condition(initial_condition)
+    
 
     def initialize_state(self):
-        self.state['real_time_mode'] = self.initial_condition['mode']
+        self.state['real_time_mode'] = np.array(self.initial_condition['mode'] * np.ones(self.net.param['state_len']), dtype=int)
 
 
     def initialize_co_state(self):
@@ -251,10 +251,10 @@ class MarkovianPiecewiseLinearSendingFlow(Flow):
 
     def sample_next_mode(self):
         if not self.param['has_multi_regime']:
-            next_mode = [np.random.choice(self.param['modes'], p=self.param['prob_matrix'][m, :]) for m in self.state['real_time_mode']]
+            next_mode = [np.random.choice(self.param['mode_list'], p=self.param['prob_matrix'][m, :]) for m in self.state['real_time_mode']]
 
         else:
-            next_mode = [np.random.choice(self.param['modes'], p=self.param['prob_matrix'][r, m, :]) for r, m in zip(self.co_state['real_time_regime'], self.state['real_time_mode'])]
+            next_mode = [np.random.choice(self.param['mode_list'], p=self.param['prob_matrix'][r, m, :]) for r, m in zip(self.co_state['real_time_regime'], self.state['real_time_mode'])]
 
         # next_mode: (state_len, ).
         return np.atleast_1d(next_mode)
