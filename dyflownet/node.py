@@ -62,14 +62,14 @@ class Node(utils.NetUnit):
             self.controller.iterate()
 
 
-    def compute_inter_cell_flow(self):
+    def compute_inter_cell_flow(self, state_len, sending_list, receiving_list):
         # Need customization. 
-        return np.zeros([self.net.param['state_len'], self.param['num_incoming_cell'], self.param['num_outgoing_cell']])
+        return np.zeros([state_len, len(sending_list), len(receiving_list)])
     
 
     def _compute_inter_cell_flow(self):
         # Need customization. 
-        return self.compute_inter_cell_flow()
+        return self.compute_inter_cell_flow(self.net.param['state_len'], self._sending_list(), self._receiving_list())
 
 
     def update_inter_cell_flow(self):
@@ -111,11 +111,6 @@ class BasicJunction(Node):
         return inter_cell_flow
     
 
-    def _compute_inter_cell_flow(self):
-        return self.compute_inter_cell_flow(self.net.param['state_len'], self._sending_list(), self._receiving_list())
-
-
-
 # ============================== 2 -> 1 (merging) =====================================
 class TwoToOneMergeJunction(Node):
     def __init__(self, ID, incoming_cell_list, outgoing_cell_list, merging_priority, controller=None, net=None, is_saved=True):
@@ -145,10 +140,6 @@ class TwoToOneMergeJunction(Node):
         inter_cell_flow[:, 1, 0] = flow_i_1_j_0
 
         return inter_cell_flow
-
-
-    def _compute_inter_cell_flow(self):
-        return self.compute_inter_cell_flow(self.net.param['state_len'], self._sending_list(), self._receiving_list())
 
 
 
@@ -199,6 +190,34 @@ class OneToTwoDivergeJunction(Node):
         return self.compute_inter_cell_flow(self.net.param['state_len'], self._sending_list(), self._receiving_list(), self.net.step)
 
 
+
+
+class RoutedDivergeJunction(Node):
+    def __init__(self, ID, incoming_cell_list, outgoing_cell_list, controller, net=None, is_saved=True):
+        
+        super().__init__(ID, incoming_cell_list, outgoing_cell_list, controller, net, is_saved)
+
+
+    def compute_inter_cell_flow(self, state_len, sending_list, receiving_list, control_input):
+        sending_i_0 = sending_list[0]
+
+        inter_cell_flow = np.zeros([state_len, len(sending_list), len(receiving_list)])
+        for j in range(len(receiving_list)):
+            inter_cell_flow[:, 0, j] = np.minimum(sending_i_0 * control_input[:, j], receiving_list[j])
+
+        return inter_cell_flow
+        
+
+    def _compute_inter_cell_flow(self):
+        if self.controller is not None:
+            control_input = self.controller.get_control_input()
+        else:
+            control_input = None
+
+        return self.compute_inter_cell_flow(self.net.param['state_len'], self._sending_list(), self._receiving_list(), control_input)
+
+
+
 # ============================== 2 -> 2 (first diverging then merging) =====================================
 
 class FreewayRampJunction(Node):
@@ -229,7 +248,7 @@ class FreewayRampJunction(Node):
         return split_to_mainline, split_to_offramp
 
 
-    def compute_inter_cell_flow(self, state_len, sending_list, receiving_list, step=None):
+    def compute_inter_cell_flow(self, state_len, sending_list, receiving_list, step=None, control_input=None):
         sending_mainline, sending_onramp = sending_list
         receiving_mainline, receiving_offramp = receiving_list
 
@@ -237,10 +256,10 @@ class FreewayRampJunction(Node):
         split_to_mainline, split_to_offramp = self._split_ratio(step)
 
         # Compute flow from onramp to mainline.
-        if self.controller is None:
+        if control_input is None:
             flow_onramp_to_mainline = np.minimum(sending_onramp, receiving_mainline)
         else:
-            flow_onramp_to_mainline = np.minimum.reduce((sending_onramp, receiving_mainline, self.controller.get_control_input()))
+            flow_onramp_to_mainline = np.minimum.reduce((sending_onramp, receiving_mainline, control_input))
 
         # Compute flow from mainline to mainline.
         sending_mainline_to_mainline = split_to_mainline * np.minimum(sending_mainline, utils.safe_div(receiving_offramp, split_to_offramp))
@@ -262,8 +281,12 @@ class FreewayRampJunction(Node):
 
 
     def _compute_inter_cell_flow(self):
-        return self.compute_inter_cell_flow(self.net.param['state_len'], self._sending_list(), self._receiving_list(), self.net.step)
+        if self.controller is not None:
+            control_input = self.controller.get_control_input()
+        else:
+            control_input = None
 
+        return self.compute_inter_cell_flow(self.net.param['state_len'], self._sending_list(), self._receiving_list(), self.net.step, control_input)
 
 
 

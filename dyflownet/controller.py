@@ -42,6 +42,29 @@ class LocalController(utils.NetUnit):
 
 
 
+class SoftmaxRoutingController(LocalController):
+    def __init__(self, gain, min_control_input=0, max_control_input=1, node=None, cell_list=None, is_saved=True):
+
+        super().__init__(min_control_input, max_control_input, node, cell_list, is_saved)
+
+        self.param['gain'] = gain
+    
+
+    def initialize_co_state(self):
+        self.co_state['control_input'] = np.full([self.net.param['state_len'], len(self.cell_list)], np.nan)
+
+
+    def compute_control_input(self, density_list):
+        utility = np.array([np.exp(-self.param['gain'][j] * density) for j, density in enumerate(density_list)]).T
+        partition = np.sum(utility, axis=1).reshape(utility.shape[0], 1)
+        return utility / partition 
+    
+
+    def _compute_control_input(self):
+        return self.compute_control_input([c.state['density'] for c in self.cell_list])
+
+
+
 class ALINEA(LocalController):
     def __init__(self, gain, setpoint, min_control_input=0, max_control_input=np.inf, node=None, cell_list=None, is_saved=True):
 

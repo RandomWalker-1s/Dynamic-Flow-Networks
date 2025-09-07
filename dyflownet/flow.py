@@ -153,7 +153,7 @@ class PiecewiseLinearSendingFlow(Flow):
 
 
     def compute_flow(self, density):
-        return np.minimum(self.param['free_flow_speed'] * density, self.param['capacity'])
+        return np.clip(self.param['free_flow_speed'] * density, 0, self.param['capacity'])
 
 
     def _compute_flow(self):
@@ -187,7 +187,7 @@ class CapacityDropPiecewiseLinearSendingFlow(Flow):
 
     def compute_flow(self, density):
         real_capacity = np.where(density >  self.param['capacity_drop_density_threshold'], self.param['capacity_dropped'], self.param['capacity'])
-        return np.minimum(self.param['free_flow_speed'] * density, real_capacity), real_capacity
+        return np.clip(self.param['free_flow_speed'] * density, 0, real_capacity), real_capacity
 
 
     def _compute_flow(self):        
@@ -241,7 +241,7 @@ class MarkovianPiecewiseLinearSendingFlow(Flow):
 
 
     def compute_flow(self, density, mode):
-        return np.minimum(self.param['free_flow_speed'][mode] * density, self.param['capacity'][mode])
+        return np.clip(self.param['free_flow_speed'][mode] * density, 0, self.param['capacity'][mode])
 
 
     def _compute_flow(self):
@@ -305,7 +305,7 @@ class PiecewiseLinearReceivingFlow(Flow):
 
 
     def compute_flow(self, density):
-        return np.minimum(self.param['congestion_wave_speed'] * (self.param['max_density'] - density), self.param['capacity'])
+        return np.clip(self.param['congestion_wave_speed'] * (self.param['max_density'] - density), 0, self.param['capacity'])
 
 
     def _compute_flow(self):
@@ -366,7 +366,7 @@ class LookAheadPiecewiseLinearReceivingFlow(Flow):
             self.param['capacity']
         )
 
-        return np.minimum(real_congestion_wave_speed * (real_max_density - density), real_capacity)
+        return np.clip(real_congestion_wave_speed * (real_max_density - density), 0, real_capacity)
 
 
     def _compute_flow(self):
