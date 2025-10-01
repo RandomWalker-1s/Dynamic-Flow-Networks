@@ -4,9 +4,9 @@ from . import utils
 # ============================== Node =====================================
 
 class Node(utils.NetUnit):
-    def __init__(self, ID, incoming_cell_list, outgoing_cell_list, controller=None, net=None, is_saved=True):
+    def __init__(self, ID, incoming_cell_list, outgoing_cell_list, controller=None, net=None, is_state_saved=True, is_co_state_saved=True):
 
-        super().__init__(net, is_saved)
+        super().__init__(net, is_state_saved, is_co_state_saved)
 
         # Set node ID. 
         self.ID = ID
@@ -100,9 +100,9 @@ class Node(utils.NetUnit):
 # ============================== 1 -> 1 =====================================
 
 class BasicJunction(Node):
-    def __init__(self, ID, incoming_cell_list, outgoing_cell_list, controller=None, net=None, is_saved=True):
+    def __init__(self, ID, incoming_cell_list, outgoing_cell_list, controller=None, net=None, is_state_saved=True, is_co_state_saved=True):
 
-        super().__init__(ID, incoming_cell_list, outgoing_cell_list, controller, net, is_saved)
+        super().__init__(ID, incoming_cell_list, outgoing_cell_list, controller, net, is_state_saved, is_co_state_saved)
 
 
     def compute_inter_cell_flow(self, state_len, sending_list, receiving_list):
@@ -113,9 +113,9 @@ class BasicJunction(Node):
 
 # ============================== 2 -> 1 (merging) =====================================
 class TwoToOneMergeJunction(Node):
-    def __init__(self, ID, incoming_cell_list, outgoing_cell_list, merging_priority, controller=None, net=None, is_saved=True):
+    def __init__(self, ID, incoming_cell_list, outgoing_cell_list, merging_priority, controller=None, net=None, is_state_saved=True, is_co_state_saved=True):
         
-        super().__init__(ID, incoming_cell_list, outgoing_cell_list, controller, net, is_saved)
+        super().__init__(ID, incoming_cell_list, outgoing_cell_list, controller, net, is_state_saved, is_co_state_saved)
 
         # Shape of merging priority: (1, 2) or (state_len, 2).
         self.param['merging_priority'] = np.atleast_2d(merging_priority)
@@ -147,9 +147,9 @@ class TwoToOneMergeJunction(Node):
 
 class OneToTwoDivergeJunction(Node):
     def __init__(self, ID, incoming_cell_list, outgoing_cell_list, split_ratio, 
-                 is_split_ratio_constant=True, is_FIFO=True, controller=None, net=None, is_saved=True):
+                 is_split_ratio_constant=True, is_FIFO=True, controller=None, net=None, is_state_saved=True, is_co_state_saved=True):
         
-        super().__init__(ID, incoming_cell_list, outgoing_cell_list, controller, net, is_saved)
+        super().__init__(ID, incoming_cell_list, outgoing_cell_list, controller, net, is_state_saved, is_co_state_saved)
 
         # Shape of split ratio: if constant, (1, 2) or (state_len, 2); if not constant, (1, 2, num_step) or (state_len, 2, num_step). 
         self.param['split_ratio'] = np.atleast_2d(split_ratio) if is_split_ratio_constant else  np.atleast_3d(split_ratio)
@@ -193,9 +193,9 @@ class OneToTwoDivergeJunction(Node):
 
 
 class RoutedDivergeJunction(Node):
-    def __init__(self, ID, incoming_cell_list, outgoing_cell_list, controller, net=None, is_saved=True):
+    def __init__(self, ID, incoming_cell_list, outgoing_cell_list, controller, net=None, is_state_saved=True, is_co_state_saved=True):
         
-        super().__init__(ID, incoming_cell_list, outgoing_cell_list, controller, net, is_saved)
+        super().__init__(ID, incoming_cell_list, outgoing_cell_list, controller, net, is_state_saved, is_co_state_saved)
 
 
     def compute_inter_cell_flow(self, state_len, sending_list, receiving_list, control_input):
@@ -225,9 +225,9 @@ class FreewayRampJunction(Node):
     # Outgoing links: one off-ramp, one freeway mainline. 
     def __init__(self, ID, incoming_cell_list, outgoing_cell_list, 
                  onramp_priority, split_ratio, is_split_ratio_constant=True,
-                 controller=None,  net=None, is_saved=True):
+                 controller=None,  net=None, is_state_saved=True, is_co_state_saved=True):
 
-        super().__init__(ID, incoming_cell_list, outgoing_cell_list, controller, net, is_saved)
+        super().__init__(ID, incoming_cell_list, outgoing_cell_list, controller, net, is_state_saved, is_co_state_saved)
 
         # Shape of merging priority: (1, 1) or (state_len, 1).
         self.param['onramp_priority'] = np.atleast_2d(onramp_priority)

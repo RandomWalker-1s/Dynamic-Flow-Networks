@@ -4,9 +4,9 @@ from . import utils
 #===============================================================
 class Cell(utils.NetUnit):
 
-    def __init__(self, ID, max_density=np.inf, max_speed=np.inf, cell_len=1, model_order=1, net=None, is_saved=True):
+    def __init__(self, ID, max_density=np.inf, max_speed=np.inf, cell_len=1, model_order=1, net=None, is_state_saved=True, is_co_state_saved=True):
         
-        super().__init__(net, is_saved)
+        super().__init__(net, is_state_saved, is_co_state_saved)
 
         # Set cell ID. 
         self.ID = ID
@@ -85,9 +85,9 @@ class Cell(utils.NetUnit):
 class Link(Cell):
 
     def __init__(self, ID, max_density=np.inf, max_speed=np.inf, cell_len=1, model_order=1,  
-                 initial_condition=None, receiving=None, sending=None, net=None, is_saved=True):
+                 initial_condition=None, receiving=None, sending=None, net=None, is_state_saved=True, is_co_state_saved=True):
                 
-        super().__init__(ID, max_density, max_speed, cell_len, model_order, net, is_saved)
+        super().__init__(ID, max_density, max_speed, cell_len, model_order, net, is_state_saved, is_co_state_saved)
 
         self.set_initial_condition(initial_condition)
 
@@ -108,9 +108,9 @@ class Link(Cell):
 class Source(Cell):
     
     def __init__(self, ID, max_density=np.inf, max_speed=np.inf, cell_len=1, model_order=1,
-                 initial_condition=None, boundary_inflow=None, sending=None, net=None, is_saved=True):
+                 initial_condition=None, boundary_inflow=None, sending=None, net=None, is_state_saved=True, is_co_state_saved=True):
         
-        super().__init__(ID, max_density, max_speed, cell_len, model_order, net, is_saved)
+        super().__init__(ID, max_density, max_speed, cell_len, model_order, net, is_state_saved, is_co_state_saved)
 
         self.set_initial_condition(initial_condition)
 
@@ -131,9 +131,9 @@ class Source(Cell):
 class Sink(Cell):
 
     def __init__(self, ID, max_density=np.inf, max_speed=np.inf, cell_len=1, model_order=1,
-                 initial_condition=None, receiving=None, boundary_outflow=None, net=None, is_saved=True):
-
-        super().__init__(ID, max_density, max_speed, cell_len, model_order, net, is_saved)
+                 initial_condition=None, receiving=None, boundary_outflow=None, net=None, is_state_saved=True, is_co_state_saved=True):
+        
+        super().__init__(ID, max_density, max_speed, cell_len, model_order, net, is_state_saved, is_co_state_saved)
 
         self.set_initial_condition(initial_condition)
 

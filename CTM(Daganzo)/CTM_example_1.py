@@ -7,7 +7,6 @@ sys.path.append('../')
 import dyflownet as dfn 
 
 
-
 v, F, w = 1, 50, 1
 max_density, max_speed = 150, 1
 num_link = 100

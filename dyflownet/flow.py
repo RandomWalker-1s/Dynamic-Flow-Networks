@@ -3,11 +3,11 @@ from . import utils
 
 
 class Flow(utils.NetUnit):
-    def __init__(self, cell=None, is_saved=True):
+    def __init__(self, cell=None, is_state_saved=True, is_co_state_saved=True):
 
         net = None if cell is None else cell.net
 
-        super().__init__(net, is_saved)
+        super().__init__(net, is_state_saved, is_co_state_saved)
 
         self.hook_up_to_cell(cell)
 
@@ -41,9 +41,9 @@ class Flow(utils.NetUnit):
 #------------------------Boundary inflow & outflow functions.------------------------------
 
 class BoundaryInflow(Flow):
-    def __init__(self, boundary_inflow, is_bc_constant=True, cell=None, is_saved=True):
+    def __init__(self, boundary_inflow, is_bc_constant=True, cell=None, is_state_saved=True, is_co_state_saved=True):
 
-        super().__init__(cell, is_saved)
+        super().__init__(cell, is_state_saved, is_co_state_saved)
 
         # boundary_inflow: if constant, (1, ) or (state_len, ), if not constant, (1, num_step) or (state_len, num_step)
         self.param['boundary_inflow'] = np.atleast_1d(boundary_inflow) if is_bc_constant else np.atleast_2d(boundary_inflow)
@@ -67,9 +67,9 @@ class BoundaryInflow(Flow):
 
 
 class BoundaryOutflow(Flow):
-    def __init__(self, boundary_speed, boundary_capacity, is_bc_constant=True, cell=None, is_saved=True):
+    def __init__(self, boundary_speed, boundary_capacity, is_bc_constant=True, cell=None, is_state_saved=True, is_co_state_saved=True):
 
-        super().__init__(cell, is_saved)
+        super().__init__(cell, is_state_saved, is_co_state_saved)
 
         # Check if the lengths are consistent.  
         if (not is_bc_constant) and (len(boundary_speed) != len(boundary_capacity)):
@@ -102,9 +102,9 @@ class BoundaryOutflow(Flow):
 #----------------------------Sending flow functions---------------------------------
 
 class BufferSendingFlow(Flow):
-    def __init__(self, demand, is_demand_constant=True, capacity=np.inf, ignore_queue=False, cell=None, is_saved=True):
+    def __init__(self, demand, is_demand_constant=True, capacity=np.inf, ignore_queue=False, cell=None, is_state_saved=True, is_co_state_saved=True):
 
-        super().__init__(cell, is_saved)
+        super().__init__(cell, is_state_saved, is_co_state_saved)
 
         # demand: if constant, (1, ) or (state_len, ), if not constant, (1, num_step) or (state_len, num_step)
         self.param['demand'] = np.atleast_1d(demand) if is_demand_constant else np.atleast_2d(demand)
@@ -141,9 +141,9 @@ class BufferSendingFlow(Flow):
 
 
 class PiecewiseLinearSendingFlow(Flow):
-    def __init__(self, free_flow_speed, capacity, cell=None, is_saved=True):
+    def __init__(self, free_flow_speed, capacity, cell=None, is_state_saved=True, is_co_state_saved=True):
 
-        super().__init__(cell, is_saved)
+        super().__init__(cell, is_state_saved, is_co_state_saved)
 
         # free_flow_speed: (1, ) or (state_len, ).
         self.param['free_flow_speed'] = np.atleast_1d(free_flow_speed)
@@ -163,9 +163,9 @@ class PiecewiseLinearSendingFlow(Flow):
 
 
 class CapacityDropPiecewiseLinearSendingFlow(Flow):
-    def __init__(self, free_flow_speed, capacity, capacity_drop_density_threshold=None, capacity_dropped=None, cell=None, is_saved=True):
+    def __init__(self, free_flow_speed, capacity, capacity_drop_density_threshold=None, capacity_dropped=None, cell=None, is_state_saved=True, is_co_state_saved=True):
 
-        super().__init__(cell, is_saved)
+        super().__init__(cell, is_state_saved, is_co_state_saved)
 
         # free_flow_speed: (1, ) or (state_len, ).
         self.param['free_flow_speed'] = np.atleast_1d(free_flow_speed)
@@ -203,9 +203,9 @@ class CapacityDropPiecewiseLinearSendingFlow(Flow):
 
 
 class MarkovianPiecewiseLinearSendingFlow(Flow):
-    def __init__(self, mode_list, free_flow_speed, capacity, prob_matrix, initial_condition, has_multi_regime=False, regime_bound_list=None, cell=None, is_saved=True):
+    def __init__(self, mode_list, free_flow_speed, capacity, prob_matrix, initial_condition, has_multi_regime=False, regime_bound_list=None, cell=None, is_state_saved=True, is_co_state_saved=True):
 
-        super().__init__(cell, is_saved)
+        super().__init__(cell, is_state_saved, is_co_state_saved)
 
         # mode_list.
         self.param['mode_list'] = mode_list
@@ -278,8 +278,8 @@ class MarkovianPiecewiseLinearSendingFlow(Flow):
 #----------------------------Receiving flow functions---------------------------------
  
 class UnboundedReceivingFlow(Flow):
-    def __init__(self, cell=None, is_saved=True):
-        super().__init__(cell, is_saved)
+    def __init__(self, cell=None, is_state_saved=True, is_co_state_saved=True):
+        super().__init__(cell, is_state_saved, is_co_state_saved)
 
     def compute_flow(self, state_len):
         return np.inf * np.ones(state_len)
@@ -290,9 +290,9 @@ class UnboundedReceivingFlow(Flow):
 
 
 class PiecewiseLinearReceivingFlow(Flow):
-    def __init__(self, congestion_wave_speed, max_density, capacity=np.inf, cell=None, is_saved=True):
+    def __init__(self, congestion_wave_speed, max_density, capacity=np.inf, cell=None, is_state_saved=True, is_co_state_saved=True):
         
-        super().__init__(cell, is_saved)
+        super().__init__(cell, is_state_saved, is_co_state_saved)
 
         # congestion_wave_speed: (1, ) or (state_len, ).
         self.param['congestion_wave_speed'] = np.atleast_1d(congestion_wave_speed)
@@ -316,9 +316,9 @@ class PiecewiseLinearReceivingFlow(Flow):
 class LookAheadPiecewiseLinearReceivingFlow(Flow):
     def __init__(self, congestion_wave_speed, max_density, capacity, 
                  cell=None, cell_upstream=None, look_ahead_density_threshold=None, 
-                 look_ahead_congestion_wave_speed=None, look_ahead_max_density=None, look_ahead_capacity=None, is_saved=True):
+                 look_ahead_congestion_wave_speed=None, look_ahead_max_density=None, look_ahead_capacity=None, is_state_saved=True, is_co_state_saved=True):
         
-        super().__init__(cell, is_saved)
+        super().__init__(cell, is_state_saved, is_co_state_saved)
 
         self.cell_upstream = cell_upstream
 

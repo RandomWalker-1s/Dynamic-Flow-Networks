@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.linalg import null_space
 
 def safe_div(x, y, fill = np.inf):
     return np.divide(x, y, out=np.full_like(x, fill, dtype=float), where=(y != 0))
@@ -20,13 +21,23 @@ def generate_boundary_combos(*arrays):
     return unravel[:, np.any(is_endpoint, axis=0)]
 
 
+def get_stationary_distribution(prob_matrix):
+    A = prob_matrix - np.eye(prob_matrix.shape[0])
+    nullspace = null_space(A.T)
+
+    return (nullspace.T / np.sum(nullspace))[0, :]
+    
+
 
 class NetUnit:
-    def __init__(self, net=None, is_saved=True):
+    def __init__(self, net=None, is_state_saved=True, is_co_state_saved=True):
 
         self.hook_up_to_net(net)
 
-        self.param = {'is_saved': is_saved}
+        self.param = {
+            'is_state_saved': is_state_saved,
+            'is_co_state_saved': is_co_state_saved, 
+        }
 
         self.state = {}
         self.state_output = {}
@@ -65,19 +76,21 @@ class NetUnit:
 
 
     def initialize_output(self):
-        if self.param['is_saved']:
+        if self.param['is_state_saved']:
             for k, v in self.state.items():
                 self.state_output[k] = np.full(v.shape + (self.net.param['num_step']+1,), np.nan)
                 self.state_output[k][:, 0] = v
-            
+        
+        if self.param['is_co_state_saved']:
             for k, v in self.co_state.items():
                 self.co_state_output[k] = np.full(v.shape + (self.net.param['num_step'],), np.nan)
             
     
     def save_output(self):
-        if self.param['is_saved']:
+        if self.param['is_state_saved']:
             for k, v in self.state_output.items():
                 v[..., self.net.step+1] = self.state[k]
 
+        if self.param['is_co_state_saved']:
             for k, v in self.co_state_output.items():
                 v[..., self.net.step] = self.co_state[k]

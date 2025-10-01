@@ -3,11 +3,11 @@ from . import utils
 
 
 class LocalController(utils.NetUnit):
-    def __init__(self, min_control_input=0, max_control_input=np.inf, node=None, cell_list=None, is_saved=True):
+    def __init__(self, min_control_input=0, max_control_input=np.inf, node=None, cell_list=None, is_state_saved=True, is_co_state_saved=True):
 
         net = None if node is None else node.net
 
-        super().__init__(net, is_saved)
+        super().__init__(net, is_state_saved, is_co_state_saved)
 
         self.hook_up_to_node(node)
 
@@ -43,9 +43,9 @@ class LocalController(utils.NetUnit):
 
 
 class SoftmaxRoutingController(LocalController):
-    def __init__(self, gain, min_control_input=0, max_control_input=1, node=None, cell_list=None, is_saved=True):
+    def __init__(self, gain, min_control_input=0, max_control_input=1, node=None, cell_list=None, is_state_saved=True, is_co_state_saved=True):
 
-        super().__init__(min_control_input, max_control_input, node, cell_list, is_saved)
+        super().__init__(min_control_input, max_control_input, node, cell_list, is_state_saved, is_co_state_saved)
 
         self.param['gain'] = gain
     
@@ -66,9 +66,9 @@ class SoftmaxRoutingController(LocalController):
 
 
 class ALINEA(LocalController):
-    def __init__(self, gain, setpoint, min_control_input=0, max_control_input=np.inf, node=None, cell_list=None, is_saved=True):
+    def __init__(self, gain, setpoint, min_control_input=0, max_control_input=np.inf, node=None, cell_list=None, is_state_saved=True, is_co_state_saved=True):
 
-        super().__init__(min_control_input, max_control_input, node, cell_list, is_saved)
+        super().__init__(min_control_input, max_control_input, node, cell_list, is_state_saved, is_co_state_saved)
 
         self.param['gain'] = gain
         self.param['setpoint'] = setpoint
@@ -102,9 +102,9 @@ class ALINEA(LocalController):
 
 class AffineController(LocalController):
     # Control law: H - K*x. 
-    def __init__(self, gain, min_control_input=0, max_control_input=np.inf, node=None, cell_list=None, is_saved=True):
+    def __init__(self, gain, min_control_input=0, max_control_input=np.inf, node=None, cell_list=None, is_state_saved=True, is_co_state_saved=True):
 
-        super().__init__(min_control_input, max_control_input, node, cell_list, is_saved)
+        super().__init__(min_control_input, max_control_input, node, cell_list, is_state_saved, is_co_state_saved)
 
         self.param['gain'] = gain
 
@@ -116,7 +116,6 @@ class AffineController(LocalController):
 
     def _compute_control_input(self):
         return self.compute_control_input(self.cell_list[0].state['density'])
-
 
 
 
